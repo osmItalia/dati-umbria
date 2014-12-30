@@ -7,7 +7,7 @@ for i in `seq 1000 1000 200000`
 do
 	url=$url1$prev$url2$i$url3
 	echo "generate shapefile from record $prev to record $i"
-	prev=$i
+	prev=`echo "$prev+1" | bc`
 	ogr2ogr $i.shp "$url" OGRGeoJSON
 done
 echo "merging shape files"
