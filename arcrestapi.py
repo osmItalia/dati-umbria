@@ -183,7 +183,7 @@ class ArcGIS:
         return sql
             
     def _insertdata(self,name,data,dbout):
-        if (data[0]["geometryType"] == ""):
+        if (data[0].has_key("geometryType")):
             geomtype = data[0]["geometryType"].replace("esriGeometry","")
             create = self._createtable(name,data[0]["fields"])
             add = self._addgeometrycolumn(name,data)
