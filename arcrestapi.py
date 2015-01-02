@@ -183,58 +183,59 @@ class ArcGIS:
         return sql
             
     def _insertdata(self,name,data,dbout):
-        geomtype = data[0]["geometryType"].replace("esriGeometry","")
-        create = self._createtable(name,data[0]["fields"])
-        add = self._addgeometrycolumn(name,data)
-        con=sqlite3.connect(dbout)        
-        con.enable_load_extension(True)
-        cur = con.cursor()
-        cur.execute('SELECT load_extension("mod_spatialite")');
-        cur.execute('SELECT InitSpatialMetadata();')
-        print create
-        cur.execute(create)
-        cur.execute(add)
-        cur.execute('BEGIN;')
-        for d in data:
-            geometries=[]
-            features=d["features"]
-            for f in features:
-                sql = ""
-                sql1="INSERT INTO %s (" % name
-                sql2 = ""
-                sql3 = ""
-                if (geomtype.upper() != 'POINT'): 
-                    rings=[]
-                    coordinates = f["geometry"]["rings"]
-                    for points in coordinates:
-                        strring = ''
-                        for ring in points:
-                             strring+='%s %s,' % (tuple(ring))
-                        strring = strring.rstrip(",")
-                        rings.append(strring)
-                    geometry='GeometryFromText("'+geomtype+'('
-                    for ring in rings:
-                        geometry +='('+ ring+')'
-                    geometry += ')",'+ str(data[0]["spatialReference"]["wkid"]) +')'
-                    geometries.append(geometry)
-                if (geomtype.upper() == "POINT"):
-                    x = f["geometry"]["x"]
-                    y = f["geometry"]["y"]
-                    srid = str(data[0]["spatialReference"]["wkid"])
-                    geometry="GeometryFromText('POINT(%s %s)',%s)" % (x,y,srid)
-                    
-                for field in f["attributes"].items():
-                    sql2 +='"%s",' % field[0]
-                    v = field[1]
-                    if isinstance(v, unicode):
-                        v=v.replace('"','')
-                    sql3+='"%s",' % v
-                sql2+='"geometry") VALUES ('
-                sql3+=geometry+');'
-                sql = sql1+sql2+sql3
-                cur.execute(sql)
-        #cur.execute('COMMIT;')        
-        con.commit()
+        if (data[0]["geometryType"] == ""):
+            geomtype = data[0]["geometryType"].replace("esriGeometry","")
+            create = self._createtable(name,data[0]["fields"])
+            add = self._addgeometrycolumn(name,data)
+            con=sqlite3.connect(dbout)        
+            con.enable_load_extension(True)
+            cur = con.cursor()
+            cur.execute('SELECT load_extension("mod_spatialite")');
+            cur.execute('SELECT InitSpatialMetadata();')
+            print create
+            cur.execute(create)
+            cur.execute(add)
+            cur.execute('BEGIN;')
+            for d in data:
+                geometries=[]
+                features=d["features"]
+                for f in features:
+                    sql = ""
+                    sql1="INSERT INTO %s (" % name
+                    sql2 = ""
+                    sql3 = ""
+                    if (geomtype.upper() != 'POINT'): 
+                        rings=[]
+                        coordinates = f["geometry"]["rings"]
+                        for points in coordinates:
+                            strring = ''
+                            for ring in points:
+                                 strring+='%s %s,' % (tuple(ring))
+                            strring = strring.rstrip(",")
+                            rings.append(strring)
+                        geometry='GeometryFromText("'+geomtype+'('
+                        for ring in rings:
+                            geometry +='('+ ring+')'
+                        geometry += ')",'+ str(data[0]["spatialReference"]["wkid"]) +')'
+                        geometries.append(geometry)
+                    if (geomtype.upper() == "POINT"):
+                        x = f["geometry"]["x"]
+                        y = f["geometry"]["y"]
+                        srid = str(data[0]["spatialReference"]["wkid"])
+                        geometry="GeometryFromText('POINT(%s %s)',%s)" % (x,y,srid)
+                        
+                    for field in f["attributes"].items():
+                        sql2 +='"%s",' % field[0]
+                        v = field[1]
+                        if isinstance(v, unicode):
+                            v=v.replace('"','')
+                        sql3+='"%s",' % v
+                    sql2+='"geometry") VALUES ('
+                    sql3+=geometry+');'
+                    sql = sql1+sql2+sql3
+                    cur.execute(sql)
+            #cur.execute('COMMIT;')        
+            con.commit()
         
         
     def isarcgisrest(self,url):
