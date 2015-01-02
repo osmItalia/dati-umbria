@@ -184,6 +184,7 @@ class ArcGIS:
             
     def _insertdata(self,name,data,dbout):
         if (data[0].has_key("geometryType")):
+            srid = str(data[0]["spatialReference"]["wkid"])
             geomtype = data[0]["geometryType"].replace("esriGeometry","")
             create = self._createtable(name,data[0]["fields"])
             add = self._addgeometrycolumn(name,data)
@@ -192,7 +193,6 @@ class ArcGIS:
             cur = con.cursor()
             cur.execute('SELECT load_extension("mod_spatialite")');
             cur.execute('SELECT InitSpatialMetadata();')
-            print create
             cur.execute(create)
             cur.execute(add)
             cur.execute('BEGIN;')
@@ -204,7 +204,7 @@ class ArcGIS:
                     sql1="INSERT INTO %s (" % name
                     sql2 = ""
                     sql3 = ""
-                    if (geomtype.upper() != 'POINT'): 
+                    if (geomtype.upper() == 'POLYGON'): 
                         rings=[]
                         coordinates = f["geometry"]["rings"]
                         for points in coordinates:
@@ -215,13 +215,28 @@ class ArcGIS:
                             rings.append(strring)
                         geometry='GeometryFromText("'+geomtype+'('
                         for ring in rings:
-                            geometry +='('+ ring+')'
-                        geometry += ')",'+ str(data[0]["spatialReference"]["wkid"]) +')'
+                            geometry +='(%s)' % ring
+                        geometry += ')",%s)' % srid
                         geometries.append(geometry)
+
+                    if (geomtype.upper() == "POLYLINE"):
+                        paths=[]
+                        coordinates = f["geometry"]["paths"]
+                        for points in coordinates:
+                            strring = ''
+                            for path in points:
+                                 strring+='%s %s,' % (tuple(path))
+                            strring = strring.rstrip(",")
+                            paths.append(strring)
+                        geometry='GeometryFromText("LINESTRING('
+                        for ring in paths:
+                            geometry +='('+ ring+')'
+                        geometry += ')",%s)' % srid
+                        geometries.append(geometry)                        
+                        
                     if (geomtype.upper() == "POINT"):
                         x = f["geometry"]["x"]
                         y = f["geometry"]["y"]
-                        srid = str(data[0]["spatialReference"]["wkid"])
                         geometry="GeometryFromText('POINT(%s %s)',%s)" % (x,y,srid)
                         
                     for field in f["attributes"].items():
