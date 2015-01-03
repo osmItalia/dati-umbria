@@ -11,31 +11,25 @@ import sqlite3
 
 class ArcGIS:
     """
-    A class that can download a layer from a map in an 
-    ArcGIS web service and convert it to something useful,
-    like GeoJSON.
-
+    A class to inspect a ArcGIS web service and convert a layer
+    in a spatialite database
+    
     Usage:
 
     >>> import arcgis
-    >>> source = "http://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/USA_Congressional_Districts/FeatureServer"
-    >>> arc = arcgis.ArcGIS(source)
-    >>> layer_id = 0
-    >>> shapes = arc.get(layer_id, "STATE_ABBR='IN'")
-
-    This assumes you've inspected your ArcGIS services endpoint to know what to look for.
-    ArcGIS DOES publish json files enumerating the endpoints you can query, so autodiscovery
-    could be possible further down the line.
+    >>> source = "http://geo.umbriaterritorio.it/ArcGIS/rest/services"
+    >>> arcgis = arcgis.ArcGIS(source)
+    >>> arcgis.discover() 
+    >>> for layer in arcgis.layers:
+    >>>    url=layer['url']
+    >>>    arcgis.download(url,"dati_umbria.sqlite") 
+    
+    this class is inspired by 
+    https://github.com/Schwanksta/python-arcgis-rest-query
 
     """
     def __init__(self, url):
-        self.url=url
-        self._geom_parsers = {
-            'esriGeometryPoint': self._parse_esri_point,
-            'esriGeometryMultipoint': self._parse_esri_multipoint,
-            'esriGeometryPolyline': self._parse_esri_polyline,
-            'esriGeometryPolygon': self._parse_esri_polygon
-        }      
+        self.url=url    
         self.typefields = {
             'esriFieldTypeString': 'string',
             'esriFieldTypeInteger': 'integer',
@@ -48,43 +42,6 @@ class ArcGIS:
         self.layers = []
         self.discoverd = False
 
-    def _parse_esri_point(self, geom):
-        return {
-            "type": "Point",
-            "coordinates": [
-                geom.get('x'),
-                geom.get('y')
-            ]
-        }
-
-    def _parse_esri_multipoint(self, geom):
-        return {
-            "type": "MultiPoint",
-            "coordinates": geom.get('points')
-        }
-
-    def _parse_esri_polyline(self, geom):
-        return {
-            "type": "MultiLineString",
-            "coordinates": geom.get('paths')
-        }    
-
-    def _parse_esri_polygon(self, geom):
-        return {
-            "type": "Polygon",
-            "coordinates": geom.get('rings')
-        }
- 
-    def _determine_geom_parser(self, type):
-        return self._geom_parsers.get(type)
-
-    def esri_to_geojson(self, obj, geom_parser):
-        return {
-            "type": "Feature",
-            "properties": obj.get('attributes'),
-            "geometry": geom_parser(obj.get('geometry'))
-        }
-
     def _addlayers(self,url,response):
         services=response.get('services')
         folders=response.get('folders')
@@ -95,6 +52,24 @@ class ArcGIS:
             if len(folders) > 0:
                 self._discoverfolders(url,folders)
     
+    def _replaceduplicate(self,name):
+        k = 1
+        nwname = ''
+        names = []
+        name = self._cleanname(name)
+        for l in self.layers:
+            if l['name'] == name:
+                names.append(l['name'])
+        print name
+        sd = name in names
+        if (sd):
+            while(sd):
+                nwname = name + str(k)
+                sd = nwname in names
+                k=k+1
+        print name
+        return name
+        
     def _discoverservices(self,url,services):
         for service in services:
             if service['type']=='MapServer':
@@ -110,7 +85,7 @@ class ArcGIS:
                                     datalayer = {}
                                     if (layer['type']=='Feature Layer'):
                                         datalayer['url']=layerurl
-                                        datalayer['name']=layer['name']
+                                        datalayer['name']=self._replaceduplicate(layer['name'])
                                         datalayer['folder']=url.replace(self.url,"")
                                         datalayer['properties']=layer
                                         self.layers.append(datalayer)
@@ -143,24 +118,46 @@ class ArcGIS:
         params['f']='pjson'
         params['returnCountOnly']='true'
         return int(requests.get(url,params=params).json()['count'])
-    
-    def download(self,url,dbout):
-        name = requests.get(url,params={'f':'pjson'}).json()['name']
+
+    def _cleanname(self,name):
+        name = name.strip()
         name = name.replace("-","_")
+        name = name.replace("  "," ")
         name = name.replace(" ","_")
         name = name.replace("__","_")
+        name = name.replace(")","")
+        name = name.replace("(","")
+        name = name.replace("__","_")
+        name = name.replace(",","")
+        name = name.replace(";","")
+        name = name.lower()
+        return name
+        
+    def download(self,url,dbout,completedataset=True):
+        name = requests.get(url,params={'f':'pjson'}).json()['name']
+        name = self._cleanname(name)
         url = url + "/query"
         alldata = []
-        for obj in range (1,self.countfeatures(url),1000):
-            left=obj
-            right=obj+999
-            where = "OBJECTID>=%s and OBJECTID<=%s" % (left,right)
+        if (completedataset):
+            for obj in range (1,self.countfeatures(url),1000):
+                left=obj
+                right=obj+999
+                where = "OBJECTID>=%s and OBJECTID<=%s" % (left,right)
+                params={}
+                params['where']=where
+                params['f']='pjson'    
+                params['returnGeometry']='true'
+                data = requests.get(url,params=params).json()
+                alldata.append(data)
+        else:
+            where = "OBJECTID>=1"
             params={}
             params['where']=where
             params['f']='pjson'    
             params['returnGeometry']='true'
             data = requests.get(url,params=params).json()
             alldata.append(data)
+            
         self._insertdata(name,alldata,dbout)
     
     def writedata(self,dbout):
@@ -179,7 +176,11 @@ class ArcGIS:
         return create
         
     def _addgeometrycolumn(self,name,data):
-        sql = "SELECT AddGeometryColumn('%s','geometry', %s, '%s','XY');" % (name,data[0]['spatialReference']['wkid'],data[0]['geometryType'].replace('esriGeometry',''))
+        srid = data[0]['spatialReference']['wkid']
+        geometrytype = data[0]['geometryType'].replace('esriGeometry','')
+        if geometrytype.upper() == "POLYLINE":
+            geometrytype = "LineString"
+        sql = "SELECT AddGeometryColumn('%s','geometry', %s, '%s','XY');" % (name,srid,geometrytype)
         return sql
             
     def _insertdata(self,name,data,dbout):
@@ -230,7 +231,7 @@ class ArcGIS:
                             paths.append(strring)
                         geometry='GeometryFromText("LINESTRING('
                         for ring in paths:
-                            geometry +='('+ ring+')'
+                            geometry += ring
                         geometry += ')",%s)' % srid
                         geometries.append(geometry)                        
                         
