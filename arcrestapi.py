@@ -16,7 +16,7 @@ class ArcGIS:
     
     Usage:
 
-    >>> import arcgis
+    >>> from arcrestapi import ArcGIS
     >>> source = "http://geo.umbriaterritorio.it/ArcGIS/rest/services"
     >>> arcgis = arcgis.ArcGIS(source)
     >>> arcgis.discover() 
@@ -24,7 +24,7 @@ class ArcGIS:
     >>>    url=layer['url']
     >>>    arcgis.download(url,"dati_umbria.sqlite") 
     
-    this class is inspired by 
+    this class inspired by 
     https://github.com/Schwanksta/python-arcgis-rest-query
 
     """
@@ -54,20 +54,18 @@ class ArcGIS:
     
     def _replaceduplicate(self,name):
         k = 1
-        nwname = ''
         names = []
         name = self._cleanname(name)
+        nwname = name
         for l in self.layers:
-            if l['name'] == name:
-                names.append(l['name'])
-        print name
-        sd = name in names
-        if (sd):
-            while(sd):
-                nwname = name + str(k)
-                sd = nwname in names
-                k=k+1
-        print name
+            names.append(l['name'])
+        while (nwname in names):
+            for n in names:
+                if n==nwname:
+                    nwname=name+str(k)			
+                else:
+                    k=k+1  
+        name = nwname
         return name
         
     def _discoverservices(self,url,services):
@@ -130,6 +128,7 @@ class ArcGIS:
         name = name.replace("__","_")
         name = name.replace(",","")
         name = name.replace(";","")
+        name = name.replace(",","")
         name = name.lower()
         return name
         
