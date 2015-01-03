@@ -4,7 +4,8 @@ arcgis = ArcGIS(geoportal)
 arcgis.discover()
 for l in arcgis.layers:
     url = l['url']
-    print l['name']
+    name= l['name']
+	print name
     print url
-    arcgis.download(url,"dati_umbria.sqlite",l['name'])
+    arcgis.download(url,"dati_umbria.sqlite",name)
 
