@@ -132,24 +132,16 @@ class ArcGIS:
         name = name.lower()
         return name
         
-    def download(self,url,dbout,completedataset=True):
-        name = requests.get(url,params={'f':'pjson'}).json()['name']
-        name = self._cleanname(name)
+    def download(self,url,dbout,name=None):
+        if name is None:
+            name = requests.get(url,params={'f':'pjson'}).json()['name']
+            name = self._cleanname(name)
         url = url + "/query"
         alldata = []
-        if (completedataset):
-            for obj in range (1,self.countfeatures(url),1000):
-                left=obj
-                right=obj+999
-                where = "OBJECTID>=%s and OBJECTID<=%s" % (left,right)
-                params={}
-                params['where']=where
-                params['f']='pjson'    
-                params['returnGeometry']='true'
-                data = requests.get(url,params=params).json()
-                alldata.append(data)
-        else:
-            where = "OBJECTID>=1"
+        for obj in range (1,self.countfeatures(url),1000):
+            left=obj
+            right=obj+999
+            where = "OBJECTID>=%s and OBJECTID<=%s" % (left,right)
             params={}
             params['where']=where
             params['f']='pjson'    
