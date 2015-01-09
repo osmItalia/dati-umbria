@@ -18,11 +18,13 @@ class ArcGIS:
 
     >>> from arcrestapi import ArcGIS
     >>> source = "http://geo.umbriaterritorio.it/ArcGIS/rest/services"
-    >>> arcgis = arcgis.ArcGIS(source)
+    >>> arcgis = ArcGIS(source)
     >>> arcgis.discover() 
     >>> for layer in arcgis.layers:
-    >>>    url=layer['url']
-    >>>    arcgis.download(url,"dati_umbria.sqlite") 
+    >>>    if layer['querable']:
+    >>>         url=layer['url']
+    >>>         name=layer['name']
+    >>>         arcgis.download(url,"dati_umbria.sqlite",name) 
     
     this class inspired by 
     https://github.com/Schwanksta/python-arcgis-rest-query
@@ -76,17 +78,14 @@ class ArcGIS:
                 layers = requests.get(urllayers,params={'f': 'pjson'}).json()
                 if len(layers) > 0:
                     for layer in layers['layers']:                            
-                            if (layer['type']=='Feature Layer'):
-                                layerurl = urllayers.replace('layers','')+str(layer['id'])
-                                #layerurl = url + "/" +  name.pop() + str(layer['id'])
-                                if self.querable(layerurl):
-                                    datalayer = {}
-                                    if (layer['type']=='Feature Layer'):
-                                        datalayer['url']=layerurl
-                                        datalayer['name']=self._replaceduplicate(layer['name'])
-                                        datalayer['folder']=url.replace(self.url,"")
-                                        datalayer['properties']=layer
-                                        self.layers.append(datalayer)
+                        layerurl = urllayers.replace('layers','')+str(layer['id'])
+                        datalayer = {}
+                        datalayer['url']=layerurl
+                        datalayer['name']=self._replaceduplicate(layer['name'])
+                        datalayer['folder']=url.replace(self.url,"")
+                        datalayer['properties']=layer
+                        datalayer['querable']=self.querable(layerurl)
+                        self.layers.append(datalayer)
 
     def _discoverfolders(self,url,folders):
         for folder in folders:
@@ -132,23 +131,35 @@ class ArcGIS:
         name = name.lower()
         return name
         
-    def download(self,url,dbout,name=None):
+    def download(self,url,dbout,name=None,left=None,right=None):
         if name is None:
             name = requests.get(url,params={'f':'pjson'}).json()['name']
             name = self._cleanname(name)
         url = url + "/query"
         alldata = []
-        for obj in range (1,self.countfeatures(url),1000):
-            left=obj
-            right=obj+999
+        totalrecords = self.countfeatures(url)
+        if totalrecords == 1:
+            totalrecords = 2
+        if (left is None and right is None):
+            for obj in range (1,totalrecords,1000):
+                left=obj
+                right=obj+999
+                where = "OBJECTID>=%s and OBJECTID<=%s" % (left,right)
+                params={}
+                params['where']=where
+                params['f']='pjson'    
+                params['returnGeometry']='true'
+                data = requests.get(url,params=params).json()
+                alldata.append(data)
+        else:
             where = "OBJECTID>=%s and OBJECTID<=%s" % (left,right)
             params={}
             params['where']=where
             params['f']='pjson'    
             params['returnGeometry']='true'
             data = requests.get(url,params=params).json()
-            alldata.append(data)
-            
+            alldata.append(data)           
+        
         self._insertdata(name,alldata,dbout)
     
     def writedata(self,dbout):
@@ -161,6 +172,7 @@ class ArcGIS:
     def _createtable(self,name,fields):
         create="CREATE TABLE IF NOT EXISTS "+ name +" ("
         for field in fields:
+            field = self._cleanname(field)
             create += field['name']+' '+self.typefields[field['type']] + ','
         create=create.rstrip(",")
         create+=");"
@@ -252,7 +264,4 @@ class ArcGIS:
         return isrest
 
 def urljoin(*args):
-    """
-    There's probably a better way of handling this.
-    """
     return "/".join(map(lambda x: str(x).rstrip('/'), args))
