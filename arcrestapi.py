@@ -172,8 +172,8 @@ class ArcGIS:
     def _createtable(self,name,fields):
         create="CREATE TABLE IF NOT EXISTS "+ name +" ("
         for field in fields:
-            field = self._cleanname(field)
-            create += field['name']+' '+self.typefields[field['type']] + ','
+            fieldname = self._cleanname(field['name'])
+            create += fieldname['name']+' '+self.typefields[field['type']] + ','
         create=create.rstrip(",")
         create+=");"
         return create
