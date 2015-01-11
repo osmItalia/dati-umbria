@@ -180,6 +180,7 @@ class ArcGIS:
     def _createtable(self,name,fields):
         create="CREATE TABLE IF NOT EXISTS "+ name +" ("
         for field in fields:
+            print field
             fieldname = self._cleanname(field['name'])
             create += fieldname +' '+self.typefields[field['type']] + ','
         create=create.rstrip(",")
