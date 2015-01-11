@@ -178,10 +178,14 @@ class ArcGIS:
         cur.execute("SELECT InitSpatialMetadata();")
     
     def _createtable(self,name,fields):
+        name = self._cleanname(name)
+        name = name.replace("'","")
+        name = name.replace('"','')       
         create="CREATE TABLE IF NOT EXISTS "+ name +" ("
         for field in fields:
-            print field
             fieldname = self._cleanname(field['name'])
+            fieldname = fieldname.replace("'","")
+            fieldname = fieldname.replace('"','')
             create += fieldname +' '+self.typefields[field['type']] + ','
         create=create.rstrip(",")
         create+=");"
@@ -202,6 +206,7 @@ class ArcGIS:
             srid = str(data[0]["spatialReference"]["wkid"])
             geomtype = data[0]["geometryType"].replace("esriGeometry","")
             create = self._createtable(name,data[0]["fields"])
+            print create
             add = self._addgeometrycolumn(name,data)
             con=sqlite3.connect(dbout)        
             con.enable_load_extension(True)
