@@ -192,6 +192,9 @@ class ArcGIS:
         return create
         
     def _addgeometrycolumn(self,name,data):
+        name = self._cleanname(name)
+        name = name.replace("'","")
+        name = name.replace('"','') 
         srid = data[0]['spatialReference']['wkid']
         geometrytype = data[0]['geometryType'].replace('esriGeometry','')
         if geometrytype.upper() == "POLYLINE":
@@ -206,7 +209,6 @@ class ArcGIS:
             srid = str(data[0]["spatialReference"]["wkid"])
             geomtype = data[0]["geometryType"].replace("esriGeometry","")
             create = self._createtable(name,data[0]["fields"])
-            print create
             add = self._addgeometrycolumn(name,data)
             con=sqlite3.connect(dbout)        
             con.enable_load_extension(True)
