@@ -191,6 +191,8 @@ class ArcGIS:
         geometrytype = data[0]['geometryType'].replace('esriGeometry','')
         if geometrytype.upper() == "POLYLINE":
             geometrytype = "MultiLineString"
+        if geometrytype.upper() == "POLYGON":
+            geometrytype = "MultiPolygon"
         sql = "SELECT AddGeometryColumn('%s','geometry', %s, '%s','XY');" % (name,srid,geometrytype)
         return sql
             
@@ -217,13 +219,17 @@ class ArcGIS:
                     sql2 = ""
                     sql3 = ""
                     if (geomtype.upper() == 'POLYGON'): 
-                        polygon = None
+                        polygons = []
+                        
                         rings = f["geometry"]["rings"]
-                        if len(rings) == 1:
-                            polygon = Polygon(rings[0])
-                        else:
-                            polygon = MultiPolygon(rings) 
-                        geometry = 'GeometryFromText("%s",%s)' % (polygon.wkt,srid)
+                        #if len(rings) == 1:
+                        #    polygon = Polygon(rings[0])
+                        #else:
+                        for ring in rings:
+                            polygon = Polygon(ring)
+                            polygons.append(polygon)
+                        mpoly = MultiPolygon(polygons)
+                        geometry = 'GeometryFromText("%s",%s)' % (mpoly.wkt,srid)
                         #geometries.append(geometry)
 
                     if (geomtype.upper() == "POLYLINE"):
