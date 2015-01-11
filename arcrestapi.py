@@ -8,6 +8,13 @@ Created on Tue Dec 30 15:11:49 2014
 from bs4 import BeautifulSoup
 import requests
 import sqlite3
+#from shapely.geometry.polygon import LinearRing
+#from shapely.geometry import LineString
+from shapely.geometry import MultiLineString
+from shapely.geometry import MultiPolygon
+from shapely.geometry import Polygon
+from shapely.geometry import Point
+
 
 class ArcGIS:
     """
@@ -127,6 +134,7 @@ class ArcGIS:
         name = name.replace("__","_")
         name = name.replace(",","")
         name = name.replace(";","")
+        name = name.replace(".","")
         name = name.replace(",","")
         name = name.lower()
         return name
@@ -182,7 +190,7 @@ class ArcGIS:
         srid = data[0]['spatialReference']['wkid']
         geometrytype = data[0]['geometryType'].replace('esriGeometry','')
         if geometrytype.upper() == "POLYLINE":
-            geometrytype = "LineString"
+            geometrytype = "MultiLineString"
         sql = "SELECT AddGeometryColumn('%s','geometry', %s, '%s','XY');" % (name,srid,geometrytype)
         return sql
             
@@ -201,7 +209,7 @@ class ArcGIS:
             cur.execute(add)
             cur.execute('BEGIN;')
             for d in data:
-                geometries=[]
+                #geometries=[]
                 features=d["features"]
                 for f in features:
                     sql = ""
@@ -209,39 +217,29 @@ class ArcGIS:
                     sql2 = ""
                     sql3 = ""
                     if (geomtype.upper() == 'POLYGON'): 
-                        rings=[]
-                        coordinates = f["geometry"]["rings"]
-                        for points in coordinates:
-                            strring = ''
-                            for ring in points:
-                                 strring+='%s %s,' % (tuple(ring))
-                            strring = strring.rstrip(",")
-                            rings.append(strring)
-                        geometry='GeometryFromText("'+geomtype+'('
-                        for ring in rings:
-                            geometry +='(%s)' % ring
-                        geometry += ')",%s)' % srid
-                        geometries.append(geometry)
+                        polygon = None
+                        rings = f["geometry"]["rings"]
+                        if len(rings) == 1:
+                            polygon = Polygon(rings[0])
+                        else:
+                            polygon = MultiPolygon(rings) 
+                        geometry = 'GeometryFromText("%s",%s)' % (polygon.wkt,srid)
+                        #geometries.append(geometry)
 
                     if (geomtype.upper() == "POLYLINE"):
-                        paths=[]
-                        coordinates = f["geometry"]["paths"]
-                        for points in coordinates:
-                            strring = ''
-                            for path in points:
-                                 strring+='%s %s,' % (tuple(path))
-                            strring = strring.rstrip(",")
-                            paths.append(strring)
-                        geometry='GeometryFromText("LINESTRING('
-                        for ring in paths:
-                            geometry += ring
-                        geometry += ')",%s)' % srid
-                        geometries.append(geometry)                        
+                        line = None
+                        paths = f["geometry"]["paths"]
+                        #if len(paths) == 1:
+                        #    line = LineString(paths[0])
+                        #else:
+                        #    line = MultiLineString(paths) 
+                        line = MultiLineString(paths)
+                        geometry = 'GeometryFromText("%s",%s)' % (line.wkt,srid)
+                        #geometries.append(geometry)
                         
                     if (geomtype.upper() == "POINT"):
-                        x = f["geometry"]["x"]
-                        y = f["geometry"]["y"]
-                        geometry="GeometryFromText('POINT(%s %s)',%s)" % (x,y,srid)
+                        point = Point(f["geometry"])
+                        geometry="GeometryFromText('%s',%s)" % (point.wkt,srid)
                         
                     for field in f["attributes"].items():
                         sql2 +='"%s",' % field[0]
