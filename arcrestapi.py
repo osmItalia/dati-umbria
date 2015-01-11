@@ -238,7 +238,7 @@ class ArcGIS:
                         #geometries.append(geometry)
                         
                     if (geomtype.upper() == "POINT"):
-                        point = Point(f["geometry"])
+                        point = Point(f['geometry']['x'],f['geometry']['y'])
                         geometry="GeometryFromText('%s',%s)" % (point.wkt,srid)
                         
                     for field in f["attributes"].items():
