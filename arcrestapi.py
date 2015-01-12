@@ -222,6 +222,9 @@ class ArcGIS:
                 #geometries=[]
                 features=d["features"]
                 for f in features:
+                    name = self._cleanname(name)
+                    name = name.replace("'","")
+                    name = name.replace('"','') 
                     sql = ""
                     sql1="INSERT INTO %s (" % name
                     sql2 = ""
