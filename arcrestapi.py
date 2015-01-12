@@ -136,6 +136,7 @@ class ArcGIS:
         name = name.replace(";","")
         name = name.replace(".","")
         name = name.replace(",","")
+        name = name.replace(":","_")
         name = name.lower()
         return name
         
