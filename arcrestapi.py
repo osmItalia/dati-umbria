@@ -46,7 +46,8 @@ class ArcGIS:
             'esriFieldTypeDouble': 'real',
             'esriFieldTypeSingle': 'real',
             'esriFieldTypeDate': 'timestamp',
-            'esriFieldTypeOID': 'integer'
+            'esriFieldTypeOID': 'integer',
+            'esriFieldTypeRaster': 'blob'
         }   
         self.layers = []
         self.discoverd = False
