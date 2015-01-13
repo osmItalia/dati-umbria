@@ -261,7 +261,10 @@ class ArcGIS:
                         geometry="GeometryFromText('%s',%s)" % (point.wkt,srid)
                         
                     for field in f["attributes"].items():
-                        sql2 +='"%s",' % field[0]
+                        f = self._cleanname(field[0])
+                        f = f.replace("'","")
+                        f = f.replace('"','') 
+                        sql2 +='"%s",' % f
                         v = field[1]
                         if isinstance(v, unicode):
                             v=v.replace('"','')
