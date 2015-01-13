@@ -1,5 +1,8 @@
 dati-umbria
 ===========
+Fortemente ispirato da questo blog post http://blog.spaziogis.it/2014/12/29/take-the-best-use-the-rest/ ora è possibile scaricare questi dati
+
+
 - numeri civici
 il bash script download_civici_umbria.sh interroga il servizio rest della regione umbria e genera un file .shp 
 È richiesta l'installazione di ogr2ogr 
