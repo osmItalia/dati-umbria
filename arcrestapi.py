@@ -103,7 +103,8 @@ class ArcGIS:
         name = nwname
         return name
         
-    def _discoverservices(self,url,services):
+    def _discoverservices(self,url,services,mainurl):
+        
         for service in services:
             if service['type']=='MapServer':
                 name = service['name'].split("/")
@@ -127,16 +128,23 @@ class ArcGIS:
             self._addlayers(furl,response)
             
     def discover(self,url=None):
-        if url is None:
-            url = self.url
-        self.discoverd = True
-        response = requests.get(urljoin(url),params={'f': 'pjson'}).json()
-        self.currentversion = response['currentVersion']
-        self._addlayers(url,response)
+        """
+        method to discover all the layers offered by the ArcGIS service
+        all the information are stored in self.layers
+        """
+        if (url is None or self.url is None):
+            if url is None:
+                url = self.url
+            if self.url is None:
+                self.url = url
+            self.discoverd = True
+            response = requests.get(urljoin(url),params={'f': 'pjson'}).json()
+            self.currentversion = response['currentVersion']
+            self._addlayers(url,response)
 
     def querable(self,url):
         """
-        function to discover if a source is querable
+        method to discover if a source is querable
         """        
         q = False
         links = BeautifulSoup(requests.get(url).text).findAll("a")
@@ -159,7 +167,7 @@ class ArcGIS:
 
     def _cleanname(self,name):
         """
-        this method is a work around to prevent errors for the sql commands
+        "workd around" method to prevent errors for the sql commands (FIX)
         """
         name = name.strip()
         name = name.replace("-","_")
@@ -245,7 +253,7 @@ class ArcGIS:
         return sql
             
     def _insertdata(self,name,data,dbout):
-#note: this method use
+#note: this method needs the use of spatialite >= 4.2 
         if (data[0].has_key("geometryType")):
             srid = str(data[0]["spatialReference"]["wkid"])
             geomtype = data[0]["geometryType"].replace("esriGeometry","")
@@ -282,7 +290,7 @@ class ArcGIS:
                         line = None
                         paths = f["geometry"]["paths"]
                         line = MultiLineString(paths)
-                        geometry = 'GeometryFromText("%s",%s)' % (line.wkt,srid)
+                        geometry = 'Geom imagesetryFromText("%s",%s)' % (line.wkt,srid)
                         
                     if (geomtype.upper() == "POINT"):
                         point = Point(f['geometry']['x'],f['geometry']['y'])
@@ -306,6 +314,9 @@ class ArcGIS:
         
         
     def isarcgisrest(self,url):
+        """
+        check if the source is a ArcGIS rest server
+        """
         isrest=True
         if (url.find('ArcGIS/rest')==-1):
             isrest=False
