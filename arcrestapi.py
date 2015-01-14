@@ -3,13 +3,33 @@
 Created on Tue Dec 30 15:11:49 2014
 
 @author: Maurizio Napolitano <napo@fbk.eu>
+
+The MIT License (MIT)
+
+Copyright (c) 2015 Maurizio Napolitano <napo@fbk.eu>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 """
 
 from bs4 import BeautifulSoup
 import requests
 import sqlite3
-#from shapely.geometry.polygon import LinearRing
-#from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
 from shapely.geometry import MultiPolygon
 from shapely.geometry import Polygon
@@ -37,7 +57,7 @@ class ArcGIS:
     https://github.com/Schwanksta/python-arcgis-rest-query
 
     """
-    def __init__(self, url):
+    def __init__(self, url=None):
         self.url=url    
         self.typefields = {
             'esriFieldTypeString': 'string',
@@ -62,7 +82,12 @@ class ArcGIS:
             if len(folders) > 0:
                 self._discoverfolders(url,folders)
     
-    def _replaceduplicate(self,name):
+    def _replaceduplicate(self,name): 
+        """
+        this method prevent the presence of duplicates name in the layers list's
+        this isn't not smart for the humans, but for the machines
+        """
+            
         k = 1
         names = []
         name = self._cleanname(name)
@@ -101,13 +126,18 @@ class ArcGIS:
             response = requests.get(furl,params={'f': 'pjson'}).json()
             self._addlayers(furl,response)
             
-    def discover(self):
+    def discover(self,url=None):
+        if url is None:
+            url = self.url
         self.discoverd = True
-        response = requests.get(urljoin(self.url),params={'f': 'pjson'}).json()
+        response = requests.get(urljoin(url),params={'f': 'pjson'}).json()
         self.currentversion = response['currentVersion']
-        self._addlayers(self.url,response)
+        self._addlayers(url,response)
 
     def querable(self,url):
+        """
+        function to discover if a source is querable
+        """        
         q = False
         links = BeautifulSoup(requests.get(url).text).findAll("a")
         for l in links:
@@ -117,6 +147,9 @@ class ArcGIS:
         return q
 
     def countfeatures(self,url):
+        """
+        method to know how much features are in a source
+        """
         url = url + "/query"
         params={}
         params['where']='1=1'
@@ -125,6 +158,9 @@ class ArcGIS:
         return int(requests.get(url,params=params).json()['count'])
 
     def _cleanname(self,name):
+        """
+        this method is a work around to prevent errors for the sql commands
+        """
         name = name.strip()
         name = name.replace("-","_")
         name = name.replace("  "," ")
@@ -138,10 +174,22 @@ class ArcGIS:
         name = name.replace(".","")
         name = name.replace(",","")
         name = name.replace(":","_")
+        name = name.replace("'","")
+        name = name.replace('"','')
         name = name.lower()
         return name
         
     def download(self,url,dbout,name=None,left=None,right=None):
+        """
+        this method download the data from an ArcGIS rest API 
+        server and save it on a spatialite file
+        url => a valid querable ArcGIS rest API source
+        dbout => the name of the spatialite file
+        name => the name of the new table. If you don't give, the function extract 
+        the name from the rest api
+        left and right => this define the range of data to download. 
+        If you don't give, the function assume to download everything
+        """
         if name is None:
             name = requests.get(url,params={'f':'pjson'}).json()['name']
             name = self._cleanname(name)
@@ -170,19 +218,10 @@ class ArcGIS:
             data = requests.get(url,params=params).json()
             alldata.append(data)           
         
-        self._insertdata(name,alldata,dbout)
-    
-    def writedata(self,dbout):
-        conn = sqlite3.connect(dbout) 
-        conn.enable_load_extension(True)
-        cur = conn.cursor()
-        cur.execute("SELECT load_extension('mod_spatialite');")
-        cur.execute("SELECT InitSpatialMetadata();")
+        self._insertdata(name,alldata,dbout)    
     
     def _createtable(self,name,fields):
-        name = self._cleanname(name)
-        name = name.replace("'","")
-        name = name.replace('"','')       
+        name = self._cleanname(name)      
         create="CREATE TABLE IF NOT EXISTS "+ name +" ("
         for field in fields:
             fieldname = self._cleanname(field['name'])
@@ -195,10 +234,9 @@ class ArcGIS:
         
     def _addgeometrycolumn(self,name,data):
         name = self._cleanname(name)
-        name = name.replace("'","")
-        name = name.replace('"','') 
         srid = data[0]['spatialReference']['wkid']
         geometrytype = data[0]['geometryType'].replace('esriGeometry','')
+ #note: here to improve the different kinds of geometries 
         if geometrytype.upper() == "POLYLINE":
             geometrytype = "MultiLineString"
         if geometrytype.upper() == "POLYGON":
@@ -207,6 +245,7 @@ class ArcGIS:
         return sql
             
     def _insertdata(self,name,data,dbout):
+#note: this method use
         if (data[0].has_key("geometryType")):
             srid = str(data[0]["spatialReference"]["wkid"])
             geomtype = data[0]["geometryType"].replace("esriGeometry","")
@@ -221,40 +260,29 @@ class ArcGIS:
             cur.execute(add)
             cur.execute('BEGIN;')
             for d in data:
-                #geometries=[]
                 features=d["features"]
                 for f in features:
                     name = self._cleanname(name)
-                    name = name.replace("'","")
-                    name = name.replace('"','') 
                     sql = ""
                     sql1="INSERT INTO %s (" % name
                     sql2 = ""
                     sql3 = ""
+ #note: here to improve the different kinds of geometries 
                     if (geomtype.upper() == 'POLYGON'): 
                         polygons = []
                         
                         rings = f["geometry"]["rings"]
-                        #if len(rings) == 1:
-                        #    polygon = Polygon(rings[0])
-                        #else:
                         for ring in rings:
                             polygon = Polygon(ring)
                             polygons.append(polygon)
                         mpoly = MultiPolygon(polygons)
                         geometry = 'GeometryFromText("%s",%s)' % (mpoly.wkt,srid)
-                        #geometries.append(geometry)
 
                     if (geomtype.upper() == "POLYLINE"):
                         line = None
                         paths = f["geometry"]["paths"]
-                        #if len(paths) == 1:
-                        #    line = LineString(paths[0])
-                        #else:
-                        #    line = MultiLineString(paths) 
                         line = MultiLineString(paths)
                         geometry = 'GeometryFromText("%s",%s)' % (line.wkt,srid)
-                        #geometries.append(geometry)
                         
                     if (geomtype.upper() == "POINT"):
                         point = Point(f['geometry']['x'],f['geometry']['y'])
