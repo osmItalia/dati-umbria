@@ -22,5 +22,6 @@ ogr2ogr -f "ESRI Shapefile" fabbricati.shp dati_umbria.sqlite fabbricati60
 
 ## immagini
 ![fabbricati ](https://raw.githubusercontent.com/osmItalia/dati-umbria/master/img/fabbricato_umbria_wgs84.png)
+Edificato della Regione Umbria
 
 
